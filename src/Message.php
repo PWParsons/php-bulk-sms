@@ -9,6 +9,9 @@
 
 namespace anlutro\BulkSms;
 
+use RecursiveArrayIterator;
+use RecursiveIteratorIterator;
+
 /**
  * Container class for a single SMS message.
  */
@@ -69,9 +72,9 @@ class Message
      *
      * @return $this
      */
-    protected function setRecipient($recipient)
+    protected function setRecipient($recipients)
     {
-        $this->recipient = $this->parseNumber($recipient);
+        $this->recipient = $this->parseNumbers($recipients);
 
         return $this;
     }
@@ -144,38 +147,42 @@ class Message
      *
      * @return string
      */
-    protected function parseNumber($number)
+    protected function parseNumbers(array $numbers)
     {
-        $number = (string) $number;
+        $formattedNumbers = [];
 
-        // remove whitespaces
-        $number = trim($number);
-        $number = str_replace(' ', '', $number);
+        foreach ($numbers as $number) {
+            // remove whitespaces
+            $number = trim($number);
+            $number = str_replace(' ', '', $number);
 
-        // remove + in front if exists
-        if (substr($number, 0, 1) == '+') {
-            $number = substr($number, 1);
+            // remove + in front if exists
+            if (substr($number, 0, 1) == '+') {
+                $number = substr($number, 1);
+            }
+
+            // remove 0s in front if exists
+            while (substr($number, 0, 1) === '0') {
+                $number = substr($number, 1);
+            }
+
+            // we should at this point have a normal number
+            if (!is_numeric($number)) {
+                throw new \InvalidArgumentException("Invalid SMS recipient: $number");
+            }
+
+            // is phone number is less than 9 characters, assume we need to append
+            // a country code
+            if (strlen($number) <= 8) {
+                throw new \InvalidArgumentException(
+                    "Recipient number is too short. Is the country code missing?: " . $number
+                );
+            }
+
+            array_push($formattedNumbers, $number);
         }
 
-        // remove 0s in front if exists
-        while (substr($number, 0, 1) === '0') {
-            $number = substr($number, 1);
-        }
-
-        // we should at this point have a normal number
-        if (!is_numeric($number)) {
-            throw new \InvalidArgumentException("Invalid SMS recipient: $number");
-        }
-
-        // is phone number is less than 9 characters, assume we need to append
-        // a country code
-        if (strlen($number) <= 8) {
-            throw new \InvalidArgumentException(
-                "Recipient number is too short. Is the country code missing?: " . $number
-            );
-        }
-
-        return $number;
+        return implode(", ", $this->flattenArray($formattedNumbers));
     }
 
     /**
@@ -234,5 +241,13 @@ class Message
         $message = strtr($message, $replaceCharacters);
 
         return $message;
+    }
+
+    protected function flattenArray(array $array)
+    {
+        // flatten array
+        return iterator_to_array(new RecursiveIteratorIterator(
+            new RecursiveArrayIterator($array)
+        ), false);
     }
 }
