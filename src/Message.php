@@ -147,8 +147,12 @@ class Message
      *
      * @return string
      */
-    protected function parseNumbers(array $numbers)
+    protected function parseNumbers($numbers)
     {
+        if (is_string($numbers)) {
+            $numbers = (array) $numbers;
+        }
+        
         $formattedNumbers = [];
 
         foreach ($numbers as $number) {
